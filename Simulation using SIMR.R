@@ -14,13 +14,14 @@ library(simr)
 #4. Since tested effect is known to exist, every positive test is a true
 #positive and every negative test is a Type II error (calculate power)
 
-n=10 #start with 5 rings to expand to 100 (rows in dataset)
+n=10 #start with 10 rings/observations to expand to 100 (rows in dataset)
 (x1_delay <- rnorm(n, mean=3, sd=1)) #derive a distribution for delays
 (x2_population <- rnorm(100, mean=450, sd=50)) #derive a distribution for populations of rings
 (x3_time_obs <- sample(25:30, 100, replace=TRUE))
 (x4_coverage <-sample(75:100, 100, replace=TRUE))
 (x5_ring_density <- c(1:10)) #set rings as 10 separate groups for random effect
 
+#build dataset
 CATI <- expand.grid(x5_ring_density=x5_ring_density, x1_delay=x1_delay)
 CATI <- data.frame(CATI)
 #CATI <- cbind(CATI, x2_population, x3_time_obs, x4_coverage)
@@ -31,19 +32,27 @@ View(CATI)
 (V2 <- matrix(c(0.5,0.05,0.05,0.1), 2)) # random intercept and slope variance-covariance matrix
 (s <- 1) # residual variance
 
-#GLMM model Poisson distribution
+#GLMM model using Poisson distribution
 model1 <- makeGlmer(y ~ x1_delay + (x1_delay|x5_ring_density), family="poisson", fixef=b, VarCorr=V2, data=CATI)
 print(model1)
 
+#evaluate power using a range of fixed effects for model
 set.seed(123)
 fixef(model1)["x1_delay"] <- -0.15
+powerSim(model1)
 fixef(model1)["x1_delay"] <- -0.2
+powerSim(model1)
 fixef(model1)["x1_delay"] <- -0.25
+powerSim(model1)
 fixef(model1)["x1_delay"] <- -0.3
+powerSim(model1)
 fixef(model1)["x1_delay"] <- -0.35
+powerSim(model1)
 fixef(model1)["x1_delay"] <- -0.4
+powerSim(model1)
 fixef(model1)["x1_delay"] <- -0.5
 powerSim(model1)
+
 #Power for predictor 'x1_delay'
 #(95% CI): 15.20% (13.03, 17.58), effect size (-0.1)
 #(95% CI): 22.20% (19.66, 24.91), effect size (-0.15)
@@ -53,6 +62,7 @@ powerSim(model1)
 #(95% CI): 70.70% (67.77, 73.51), effect size (-0.35)
 #(95% CI): 77.40% (74.68, 79.96), effect size (-0.4)
 #(95% CI): 88.60% (86.47, 90.50), effect size (-0.5)
+##adequate power only at 50% reduction in incidence
 
 #Increase the sample size to 150 observations
 model2 <-extend(model1, along="x1_delay", n=15)
@@ -80,15 +90,15 @@ powerSim(model2)
 #(95% CI): 91.90% (90.03, 93.52), effect size (-0.35)
 #(95% CI): 96.20% (94.82, 97.30), effect size (-0.4)
 #(95% CI): 99.30% (98.56, 99.72), effect size (-0.5)
+##adequate power at 30% reduction in incidence
 
 #Power analysis of a range of sample sizes
 pc2 <- powerCurve(model2)
 print(pc2)
 #Power for predictor 'x1_delay', (95% confidence interval),
 #by largest value of x1_delay:
-#Time elapsed: 0 h 31 m 1 s
 #3: 67.80% (64.80, 70.69) - 30 rows
-#4: 84.50% (82.11, 86.69) - 40 rows
+#4: 84.50% (82.11, 86.69) - 40 rows  **adequate power at 40 observations
 #6: 94.30% (92.68, 95.65) - 60 rows
 #7: 94.90% (93.35, 96.18) - 70 rows
 #8: 95.30% (93.80, 96.53) - 80 rows
