@@ -22,11 +22,9 @@ library(viridis)
 
 # Incubation period and serial interval (gamma distribution) (Kahn, 2019, Azman, 2015) 
 r.0          <- 2.5 #Azman, 2015 (early reproduction number before intervention)
-#inc.per     <- 1.4 #Azman, 2012 (median incubation period)
 ser.int      <- 5   #Kahn, 2019; Azman, 2015
 ser.int.rate <- 0.1 #Kahn, 2019; Azman, 2015
 ser.int.shape<- 0.5 #Kahn, 2019; Azman, 2015
-#ser.int.distr<- rgamma(n=100, shape=ser.int.shape, rate=ser.int.rate, scale=1/ser.int.rate, lower.tail)
 k            <- 4.5 #Moore, 2014 (dispersion parameter for low potential of superspreading)
 
 # Baseline scenario
@@ -78,17 +76,17 @@ cols <- sample(viridis(runs))
 total.cases <- integer(runs) # set frame with 1000 runs 
 #total.cases <- data.frame(integer(runs), delay.distr)
 
+# *** How do I include delay.distr? I would like to iterate each run over the 
+# corresponding value from the delay.distr to force a delay on CATI implementation*** 
+
 for(i in 1:runs) {
   cases <- seed
   t <- rep(0,seed)
-  times <- t
+  times <- t # Am I missing a delay statement here?
   
-# *** do I include delay.distr? I would like to iterate each run over the 
-# corresponding value from the delay.distr to force a delay on CATI implementation*** 
-
-while(cases > 0) 
-
-   if (length(times)<2) # Use different Re values as CATI is implemented. Here it's R0.
+while(cases > 0) # Am I missing a delay statement here?
+  
+  if (length(times)<2) # Use different Re values as CATI is implemented. Here it's R0.
     {secondary <- rnbinom(cases,size=k,mu=r.0)
     t.new <- numeric() + delay.distr
     for(j in 1:length(secondary)) {
