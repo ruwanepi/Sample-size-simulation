@@ -2,76 +2,89 @@
 ## Calculate power for a study using a generalised linear mixed model
 ## through simulation
 ## Author: Ruwan Ratnayake, September 2020
-## Code adapted from Green and MacLeod, 2016
+## Code adapted from Green and MacLeod, 2016 [SIMR package]
 ## <doi:10.1111/2041-210X.12504>
 #####################################################################
 
 
+####################
+# 0 - Load libraries
+####################
 library(simr) 
-
-##Assumptions:
-#Fixed effects: delay (mean=3, SD=1), population (mean=450, SD=50),
-#time observed (28-30d), coverage (80-100%)
-#Random effect: population density (score: 1-3, random normal variate, mean 2, SD 0.25)
-#Start with 100 rings (n)
-##Steps:
-#1. Simulate data for predictors (delay, population size per ring) and dependent variable (y, case counts)
-#Simulate new values for dependent variable (y)
-#3. Refit model to simulated response
-#4. Since tested effect is known to exist, every positive test is a true
-#positive and every negative test is a Type II error (calculate power)
+library(truncnorm)
+library(ggplot2)
 
 
-#Incidence per 1000 population from outbreaks in Goma, Mai-Ndombe, Maniema, Kongo Central
-#from (Inglebeen et al, 2019)
-Incidence <- c(10.2, 10.9, 11.1, 13.4, 10.3, 11.2, 14.3, 20.5,
-               15, 16, 20, 13, 15, 11, 20)
+#############################
+# 1 - Parameters and approach
+#############################
 
-#Produce a log normal distribution of cholera incidence rates to derive
-#modeled mean and standard deviation
-Inc_logn <- fitdist(Incidence, "lnorm")
-summary(Inc_logn)
-Inc_gamma <- fitdist(Incidence, "gamma")
-summary(Inc_gamma)
+# Simulate fixed effects:
+# 1.  y = incidence in 200 rings (branching model)
+# 2. x1 = delay to implementation (mean, sd)
+# 3. x2 = population coverage in ring (fixed %)
+# 4. x3 = population size (mean, sd)
+# 5. x4 = time ring is under surveillance (range of days)
+# Simulate a random effect (conceptualized as )
+# 1. x5 = this random effect simulates multiple undefined variables
+#         that represent a grouping of the rings. This will be 
+#         estimated by a score from 1 to 10, as a random normal variate)
+
+# Approach:
+# 1. Simulate data for y (from branching model)
+# 2. Simulate data for all x covariates 
+# 3. Refit model to simulated dependent variable, y
+# 4. Calculate power. Since tested effect is known to exist, every positive test can 
+#    be considered a true positive and every negative test is a 
+#    Type II error.
+
+# Input incidence from branching model
+setwd("/Users/Ruwan/Desktop/Sample-size-simulation")
+y.inc <- read.csv(file = 'Incidence.csv')
+
+# Derive the mean and standard deviation by fitting a log normal distribution 
+# and gamma distribution to incidence estimates
+inc.logn    <- fitdist(y.inc$chol.inc.1000.30d, "lnorm")
+summary(inc.logn)
+inc.gamma   <- fitdist(y.inc$chol.inc.1000.30d, "gamma")
+summary(inc.gamma)
+# Graph the fitting graphs
 par(mfrow = c(2, 2))
-plot.legend <- c("lognormal", "gamma")
-denscomp(list(Inc_logn, Inc_gamma), legendtext = plot.legend)
-qqcomp(list(Inc_logn, Inc_gamma), legendtext = plot.legend)
-cdfcomp(list(Inc_logn, Inc_gamma), legendtext = plot.legend)
-ppcomp(list(Inc_logn, Inc_gamma), legendtext = plot.legend)
+plot.legend <- c("lnorm", "gamma")
+denscomp(list(inc.logn, inc.gamma), legendtext = plot.legend)
+qqcomp(list(inc.logn, inc.gamma), legendtext = plot.legend)
+cdfcomp(list(inc.logn, inc.gamma), legendtext = plot.legend)
+ppcomp(list(inc.logn, inc.gamma), legendtext = plot.legend)
 
-#Calculate the fitted mean and standard deviation
-(mean <-exp(2.6190060+0.5*(0.2377683^2)))
-(sd  <-exp(2.6190060+0.5*(0.2377683^2))*sqrt(exp(0.2377683^2)-1))
+# Use log normal distribution (good fit) to calculate the fitted mean and SD
+# = mean (20.1), sd (4.7) versus mean (20.1), sd (4.5) (very similar)
+#(mean <-exp(2.976159+0.5*(0.228274^2)))
+#(sd  <-exp(2.976159+0.5*(0.228274^2))*sqrt(exp(0.228274^2)-1))
+# Compare with the mean and SD from the branching model incidence
+mean(y.inc$chol.inc.1000.30d)
+sd(y.inc$chol.inc.1000.30d)
 
-n=100 #start with 100 rings/observations to expand to 100 (rows in dataset)
-(x1_delay <- rnorm(n, mean=3, sd=1)) #derive a distribution for delays (fixed effect)
-(x2_population <- rnorm(n, mean=450, sd=50)) #derive a distribution for populations of rings
-(x3_time_obs <- sample(25:30, n, replace=TRUE))
-(x4_coverage <-sample(75:100, n, replace=TRUE))
-(x5_ring_density <- rep(1:10, 10)) #set rings as 10 separate groups (random effect)
-(y <- rnorm(n, mean=14.1, sd=3.4))
+# Simulate data for co-variates for 200 rings
+n=200
+x1.delay        <- rtruncnorm(n, a=1, b=7, mean=2, sd=2)
+x2.coverage     <- sample(75:100, n, replace=TRUE)
+x3.population   <- rnorm(n, mean=450, sd=50)
+x4.time.surv    <- sample(25:30, n, replace=TRUE)
+x5.random.effect<- rep(1:50, 4)
 
-#build dataset
-CATI <- data.frame(y, x1_delay, x2_population, x3_time_obs, x4_coverage, x5_ring_density)
-#CATI <- cbind(CATI, x2_population, x3_time_obs, x4_coverage)
-View(CATI)
+# Assemble dataset
+cati.sim <- data.frame(y.inc$chol.inc.1000.30d, x1.delay, x2.coverage, x3.population, x4.time.surv, x5.random.effect)
+#View(cati.sim)
 
-#Note to self: need to replace this matrix with empirically-derived
-#values.
-# fixed intercept and slope (for delay), starting at 10% reduction in incidence
-(b <- c(2, -0.1))
-#random intercept variance
-(V1 <- 0.5) 
-#random intercept and slope variance-covariance matrix
-#for group, assume 0 correlation between intercept/slope
-(V2 <- matrix(c(0.5,0,0,0.1), 2))
-#residual variance
-(s <- 1)
+#########################################
+# 2 - Generate GLMM epidemic growth model
+#########################################
 
-#GLMM model using Poisson distribution
-model1 <- makeGlmer(y ~ x1_delay + (x1_delay|x5_ring_density), family="poisson", fixef=b, VarCorr=V2, data=CATI)
-print(model1)
+# GLMM model using Poisson distribution
+
+model.sim <- glmer(y.inc$chol.inc.1000.30d ~ x1.delay + x2.coverage + x3.population + x4.time.surv + 
+                    (1|x5.random.effect), family="poisson", data=cati.sim)
+summary(model.sim)
 
 #evaluate power using a range of fixed effects for model from a
 #10% to 50% reduction in incidence
